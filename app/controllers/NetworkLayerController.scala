@@ -10,6 +10,5 @@ import play.api.mvc.{AbstractController, ControllerComponents}
 class NetworkLayerController @Inject()(system: ActorSystem,
                                        cc: ControllerComponents) extends AbstractController(cc) {
 
-  println("xui123")
   val networkActor: ActorRef = system.actorOf(NetworkServer.props, "NetworkServer")
 }

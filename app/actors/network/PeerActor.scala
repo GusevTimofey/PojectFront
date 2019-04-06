@@ -1,16 +1,28 @@
 package actors.network
 
 import java.net.InetSocketAddress
+
+import actors.network.NetworkMessages.{GeneralizedNetworkMessageProto, NetworkMessageProto, OrderRequestNetworkMessage}
+import _root_.NetworkMessageProto.GeneralizedNetworkMessage
+import actors.network.PeerActor.InnerPong
+import actors.networkCommunicators.LogicalActor.OrderDirection.Buy
 import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp._
-import actors.network.NetworkMessages.{Ping, Pong}
 import akka.io.Tcp
 import akka.util.ByteString
-import scala.util.Try
 
-class PeerActor(remoteAddress: InetSocketAddress, listener: ActorRef) extends Actor {
+import scala.concurrent.ExecutionContextExecutor
+import scala.util.Success
+import scala.concurrent.duration._
+
+class PeerActor(remoteAddress: InetSocketAddress, listener: ActorRef, networkServiceRef: ActorRef) extends Actor {
 
   context.watch(listener)
+
+  implicit val ec: ExecutionContextExecutor = context.dispatcher
+
+  context.system.scheduler.schedule(20.seconds, 20.seconds, self, OrderRequestNetworkMessage("fromPeerActor", "456", Buy, 11, 13)
+  )
 
   override def postStop(): Unit = {
     println(s"Peer handler $self to $remoteAddress is destroyed.")
@@ -28,36 +40,32 @@ class PeerActor(remoteAddress: InetSocketAddress, listener: ActorRef) extends Ac
     case fail@CommandFailed(cmd: Tcp.Command) =>
       println("Failed to execute command : " + cmd + s" cause ${fail.cause}")
       listener ! ResumeReading
-    case message => println(s"Peer connection handler for $remoteAddress Got something strange: $message")
   }
 
   def readDataFromRemote: Receive = {
-    case Received(data) =>
-      Try(data.toArray.head match {
-        case 1 =>
-          println(s"Got $Ping from $remoteAddress on PeersHandler.")
-          context.parent ! Ping
-        case 2 =>
-          println(s"Got $Pong from $remoteAddress on PeersHandler.")
-          context.parent ! Pong
-      })
+    case Received(data) => GeneralizedNetworkMessageProto.fromProto(data) match {
+      case Success(message) =>
+        println(s"Got new network message ${message.messageName} from $remoteAddress.")
+        networkServiceRef ! message
+      case _ => println(s"Can not parse received message!")
+    }
       listener ! ResumeReading
   }
 
   def writeDataToRemote: Receive = {
-    case Ping =>
-      println(s"Got $Ping to $remoteAddress on PeersHandler.")
-      listener ! Write(ByteString(Ping.typeId +: Ping.toProto.toByteArray))
-
-    case Pong =>
-      println(s"Got $Pong to $remoteAddress on PeersHandler.")
-      listener ! Write(ByteString(Pong.typeId +: Pong.toProto.toByteArray))
-
+    case message: NetworkMessageProto =>
+      val serializedMessage: GeneralizedNetworkMessage = GeneralizedNetworkMessageProto.toProto(message)
+      listener ! Write(ByteString(serializedMessage.toByteArray))
+      println(s"Sent ${message.messageName} to $remoteAddress")
     case _ =>
       println(s"Got something strange on PeerActor connected to $remoteAddress")
   }
 }
 
 object PeerActor {
-  def props(remoteAddress: InetSocketAddress, listener: ActorRef): Props = Props(new PeerActor(remoteAddress, listener))
+
+  case object InnerPong
+
+  def props(remoteAddress: InetSocketAddress, listener: ActorRef, server: ActorRef): Props =
+    Props(new PeerActor(remoteAddress, listener, server))
 }

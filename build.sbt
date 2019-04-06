@@ -11,7 +11,7 @@ resolvers += "Akka Snapshot Repository" at "http://repo.akka.io/snapshots/"
 
 scalaVersion := "2.12.2"
 
-PlayKeys.devSettings := Seq("play.server.http.port" -> "9052")
+PlayKeys.devSettings := Seq("play.server.http.port" -> "9051")
 
 libraryDependencies ++= Seq(
   "org.scodec" %% "scodec-core" % "1.10.3",
