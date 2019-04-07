@@ -5,6 +5,7 @@ message GeneralizedNetworkMessage {
     message OrderRequestProtoMessage {
 
         string assetId  = 1;
+        string exchangeAssetId = 7;
         string clientId = 2;
         uint64 price    = 3;
         uint64 volume   = 4;
@@ -22,8 +23,18 @@ message GeneralizedNetworkMessage {
         string matchedAddressId = 4;
     }
 
+    message TradeDirectiveProtoMessage {
+        string targetOrderOwnerClientId = 1;
+        string counterPartyClientId = 2;
+        string assetId = 3;
+        uint64 volume = 4;
+        uint64 price = 5;
+        uint32 order = 6;
+    }
+
     oneof innerMessage {
         OrderRequestProtoMessage orderRequest = 1;
         MatchedOrderProtoMessage matchedOrder = 2;
+        TradeDirectiveProtoMessage tradeDirective = 3;
     }
 }
